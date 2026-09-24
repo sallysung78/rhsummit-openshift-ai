@@ -69,6 +69,7 @@ v2 API에 컴포넌트 이름까지 바뀐 다른 물건입니다. 2.x 매니페
 
 | 노트 | 내용 |
 |---|---|
+| [모델 서빙 기초](notes/모델-서빙-기초.md) | 서빙이란 무엇인가, 워크플로, ServingRuntime·InferenceService, 런타임 선택 |
 | [AgentOps 모듈 5 — 에이전트·LLM 평가](notes/agentops-05-평가.md) | 관측과 평가의 차이, 스코어러 2계층, Prompt Registry |
 | [AgentOps 모듈 6 — 개발에서 운영으로](notes/agentops-06-개발에서-운영으로.md) | 평가 파이프라인, 프롬프트 회귀 탐지, 품질 게이트 |
 
