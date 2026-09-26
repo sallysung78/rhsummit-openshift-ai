@@ -25,6 +25,7 @@ metric도 param도 기록하지 않고 run을 `RUNNING`으로 남깁니다. 그 
 | `qwen3-32b-awq · run1` | FINISHED | 36.87 | 105.0 ms | 1.0 (통과) |
 | `qwen3-32b-awq · run2` | FINISHED | 36.87 | 105.0 ms | 1.0 |
 | `qwen3-32b-awq · run3 rate8` | FINISHED | 36.89 | 105.5 ms | 1.0 |
+| `qwen3-32b-awq · qwen3-32b-awq-demo-1530` | FINISHED | 36.90 | 105.1 ms | 1.0 |
 | `qwen36-35b-a3b-fp8 · pipeline` | FINISHED | 9.87 | 311.3 ms | **0.0 (기각)** |
 | `qwen36-35b-a3b-fp8 · pipeline · FAILED` | FAILED | — | — | — |
 
@@ -46,9 +47,9 @@ experiment가 세 개 보입니다. **`rhsummit-model-validation`만 여세요.*
 ### ② 실행 목록 — 표로 비교 (45초) ★ 핵심
 
 run 목록에서 metric 열을 켭니다: `output_tokens_per_second`, `mean_ttft_ms`, `gate_pass`.
-**같은 표에 32B 세 줄과 35B 한 줄이 나란히** 보입니다.
+**같은 표에 32B 네 줄과 35B 한 줄이 나란히** 보입니다.
 
-*멘트:* 32B 세 번이 36.87 · 36.87 · 36.89 — 측정이 재현됩니다. 그 옆 35B는 9.87.
+*멘트:* 32B 네 번이 36.87 · 36.87 · 36.89 · 36.90 — 측정이 재현됩니다. 그 옆 35B는 9.87.
 `gate_pass`가 1과 0으로 갈립니다. **파이프라인이 기각한 근거가 이 열입니다.**
 
 **확대할 곳**: `output_tokens_per_second` 열과 `gate_pass` 열.
@@ -56,7 +57,7 @@ run 목록에서 metric 열을 켭니다: `output_tokens_per_second`, `mean_ttft
 ### ③ 차트 뷰 — 막대로 비교 (30초)
 
 실행 목록 상단에서 차트 뷰로 전환하고 `output_tokens_per_second`를 고릅니다.
-32B 막대 셋이 같은 높이, 35B 막대 하나가 1/4 높이로 섭니다.
+32B 막대 넷이 같은 높이, 35B 막대 하나가 1/4 높이로 섭니다.
 
 *멘트:* 숫자보다 이 그림이 빠릅니다. 3.7배 차이가 한눈에 보입니다.
 
