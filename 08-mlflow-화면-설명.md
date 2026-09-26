@@ -1,115 +1,73 @@
 # MLflow 화면 — 데모에서 무엇을 보여줄 것인가
 
-MLflow는 메뉴가 많습니다. 그런데 **이 데모에서 내용이 들어 있는 화면은 세 개뿐**입니다.
-나머지는 비어 있고, 모르고 열면 "아무것도 없네"가 됩니다.
-
-이 문서는 실제 인스턴스를 조회해서 **무엇이 채워져 있고 무엇이 비어 있는지** 확인한
-결과입니다.
+MLflow는 메뉴가 많지만 이 데모에서 쓰는 화면은 **experiment 하나, 그 안의 세 뷰**입니다.
+이 문서는 실제 인스턴스를 조회해 **무엇이 채워져 있고 무엇이 비어 있는지** 확인한 결과입니다.
 
 ---
 
-## 먼저 알아야 할 것 — 화면이 비어 보이는 이유
+## 먼저 알아야 할 것 — 처음엔 비어 있었고, 그래서 채웠습니다
 
-**EvalHub는 MLflow에 metric을 기록하지 않습니다.** run을 만들고 `evaluation-card.json`
-아티팩트 하나를 올리는 것이 전부입니다. 확인해 보면 이렇습니다.
+**EvalHub는 MLflow에 run을 만들고 `evaluation-card.json` 아티팩트만 올립니다.**
+metric도 param도 기록하지 않고 run을 `RUNNING`으로 남깁니다. 그 상태로 Overview를
+열면 아무것도 없습니다 — 실제로 그렇게 보였습니다.
 
-| | 실제 값 |
+그래서 **카드의 숫자를 metric으로 옮겨 적는 단계**를 넣었습니다.
+
+| 어디서 | 무엇을 |
 |---|---|
-| run 개수 | 5 |
-| 각 run의 metrics | **0개** |
-| 각 run의 params | **0개** |
-| 각 run의 tags | 3개 |
-| run 상태 | 전부 **`Running`** (끝나도 닫히지 않습니다) |
+| 파이프라인 `measure` 단계 | 평가가 끝나면 metric 6개·param·tag를 기록하고 run을 `FINISHED`로 닫음 |
+| `scripts/16-mlflow-record.sh` | 이미 끝난 EvalHub 작업을 소급 기록 (데모 전 한 번 실행) |
 
-그래서 MLflow를 열면 이렇게 됩니다.
+기록 후 실제로 보이는 것:
 
-| 화면 | 상태 |
-|---|---|
-| Experiments 목록 | 내용 있음 |
-| 실행(run) 목록 | 행은 보이지만 **metric·parameter 열이 전부 빈칸** |
-| **Chart / 그래프 탭** | **완전히 비어 있음** |
-| **Artifacts 탭** | **← 숫자는 전부 여기 있습니다** |
-| Models (모델 레지스트리) | 비어 있음 — MLflow 쪽 레지스트리는 안 씁니다 |
-| Prompts | 비어 있음 |
-| Traces / Evaluations | 비어 있음 |
+| run | 상태 | tok/s | TTFT | gate |
+|---|---|---|---|---|
+| `qwen3-32b-awq · run1` | FINISHED | 36.87 | 105.0 ms | 1.0 (통과) |
+| `qwen3-32b-awq · run2` | FINISHED | 36.87 | 105.0 ms | 1.0 |
+| `qwen3-32b-awq · run3 rate8` | FINISHED | 36.89 | 105.5 ms | 1.0 |
+| `qwen36-35b-a3b-fp8 · pipeline` | FINISHED | 9.87 | 311.3 ms | **0.0 (기각)** |
+| `qwen36-35b-a3b-fp8 · pipeline · FAILED` | FAILED | — | — | — |
 
-> ⚠️ **그래프를 보여주겠다는 계획이라면 지금 바꾸세요.** 차트 탭에는 아무것도 없습니다.
-> 리허설 없이 무대에서 누르면 빈 화면이 뜹니다.
+> ⚠️ **데모 전에 `16-mlflow-record.sh`를 한 번 돌리세요.** 그 사이 EvalHub로 새 평가를
+> 돌렸다면 그 run은 다시 빈 상태입니다. 스크립트는 metric이 없는 완료 run만 채우므로
+> 여러 번 실행해도 안전합니다.
 
 ---
 
-## 보여줄 것 — 화면 세 개, 약 90초
+## 보여줄 것 — 세 뷰, 약 2분
 
-### ① Experiments 목록 (15초)
+### ① Experiments → `rhsummit-model-validation` (15초)
 
-대시보드에서 MLflow를 엽니다. experiment가 세 개 보입니다.
+experiment가 세 개 보입니다. **`rhsummit-model-validation`만 여세요.** `AIP-default`와
+`MLflow Demo`는 기본 생성물·샘플입니다.
 
-| 이름 | 무엇인가 |
-|---|---|
-| **`rhsummit-model-validation`** | **우리가 만든 것. 이것만 여세요** |
-| `AIP-default` | 기본 생성물 |
-| `MLflow Demo` | 샘플 |
+*멘트:* 평가를 돌릴 때마다 결과가 여기 한 곳에 모입니다.
 
-*멘트:* 평가를 돌릴 때마다 결과가 여기 한 곳에 모입니다. 모델을 바꿔도 같은 자리에서
-비교합니다.
+### ② 실행 목록 — 표로 비교 (45초) ★ 핵심
 
-> 샘플 두 개를 미리 지우거나, 최소한 **어느 것이 우리 것인지 먼저 말하고** 여세요.
-> 그냥 열면 청중이 세 개 중 무엇을 봐야 할지 모릅니다.
+run 목록에서 metric 열을 켭니다: `output_tokens_per_second`, `mean_ttft_ms`, `gate_pass`.
+**같은 표에 32B 세 줄과 35B 한 줄이 나란히** 보입니다.
 
-### ② 실행 목록 (30초)
+*멘트:* 32B 세 번이 36.87 · 36.87 · 36.89 — 측정이 재현됩니다. 그 옆 35B는 9.87.
+`gate_pass`가 1과 0으로 갈립니다. **파이프라인이 기각한 근거가 이 열입니다.**
 
-`rhsummit-model-validation`을 엽니다. run 5개가 보입니다. 이름은 평가 작업 이름입니다
-(예: `qwen36-35b-a3b-fp8-constant-pipeline`).
+**확대할 곳**: `output_tokens_per_second` 열과 `gate_pass` 열.
 
-*멘트:* 평가를 돌린 횟수만큼 기록이 쌓입니다. 어떤 모델을, 언제, 어떤 조건으로 쟀는지가
-남습니다.
+### ③ 차트 뷰 — 막대로 비교 (30초)
 
-**여기서 주의할 점 세 가지**
+실행 목록 상단에서 차트 뷰로 전환하고 `output_tokens_per_second`를 고릅니다.
+32B 막대 셋이 같은 높이, 35B 막대 하나가 1/4 높이로 섭니다.
 
-**metric 열은 비어 있습니다.** 열 설정을 열어 metric을 추가하려 하지 마세요. 없습니다.
-"숫자는 각 실행 안에 카드로 들어 있습니다"라고 말하고 넘어가세요.
+*멘트:* 숫자보다 이 그림이 빠릅니다. 3.7배 차이가 한눈에 보입니다.
 
-**상태가 전부 `Running`입니다.** 끝난 작업인데도 그렇습니다. EvalHub가 run을 닫지
-않습니다. 청중이 물으면 **"아직 돌고 있는 게 아니라 종료 표시를 안 남기는 것"** 이라고
-답하세요. 숨기면 나중에 더 이상해 보입니다.
+### ④ run 하나 → Overview (30초, 선택)
 
-**run 이름이 중복됩니다.** 파이프라인이 고정된 이름을 쓰기 때문입니다. 데모 전에
-**작업 이름에 모델명이나 시각을 넣어 구분되게 하세요.** 이름이 같은 행이 다섯 개 있으면
-"기록이 쌓인다"는 메시지가 오히려 약해집니다.
+`qwen36-35b-a3b-fp8 · pipeline`을 엽니다. Overview에 **Parameters**와 **Metrics**가 표로
+있습니다. `vllm_args`(OOM 회피 인자)와 `gpu` 파라미터를 짚으세요 — **조건이 기록되어
+있어야 나중에 비교가 의미 있습니다.**
 
-### ③ Artifacts → `evaluation-card.json` (45초) ★ 핵심
-
-run 하나를 열고 **Artifacts 탭**으로 갑니다. `evaluation-card.json` 하나가 있습니다.
-열면 이 구조입니다.
-
-```json
-{
-  "context": {
-    "model": { "name": "...", "url": "..." },
-    "benchmarks": [{ "id": "constant", "parameters": { ... } }]
-  },
-  "results": {
-    "benchmarks": [{
-      "metrics": {
-        "mean_ttft_ms": 311.29,
-        "mean_itl_ms": 99.85,
-        "output_tokens_per_second": 9.87,
-        "prompt_tokens_per_second": 22.61,
-        "requests_per_second": 0.075
-      },
-      "test": { "primary_score": 9.87, "threshold": 10, "pass": false }
-    }]
-  }
-}
-```
-
-*멘트:* **이 카드가 이 화면의 핵심입니다.** 무엇을 어떤 조건으로 쟀고, 결과가 얼마였고,
-기준을 통과했는지가 한 파일에 들어 있습니다. 재현에 필요한 정보가 결과와 같은 자리에
-있습니다.
-
-`test.pass`가 `false`인 것을 짚어 주세요. **파이프라인이 기각한 근거가 이 파일입니다.**
-
-**확대할 곳**: `metrics` 블록과 `test` 블록. 두 군데만.
+Artifacts 탭의 `evaluation-card.json`은 원본 증거입니다. 필요하면 열되, 숫자는 이미
+Overview에 있으니 시간이 없으면 건너뛰세요.
 
 ---
 
@@ -117,39 +75,35 @@ run 하나를 열고 **Artifacts 탭**으로 갑니다. `evaluation-card.json` �
 
 | 메뉴 | 왜 |
 |---|---|
-| Chart / 그래프 탭 | 비어 있습니다 |
-| Models | 비어 있습니다. **모델 레지스트리는 OpenShift AI 쪽을 쓰고 MLflow 쪽은 안 씁니다** |
-| Prompts | 비어 있습니다 |
-| Traces / Evaluations | 비어 있습니다 |
-| Compare (run 비교) | 비교할 metric이 없어 빈 표가 나옵니다 |
+| **Models** | 비어 있음. **모델 버전 관리는 OpenShift AI 모델 레지스트리에서** 하고 MLflow 쪽은 안 씁니다 |
+| Prompts | 비어 있음 |
+| Traces / Evaluations | 비어 있음 |
+| System metrics 탭 | 기록 안 함 |
 
-**"Models" 메뉴는 특히 헷갈립니다.** 앞에서 모델 레지스트리를 보여줬는데 MLflow에도
-같은 이름의 메뉴가 있습니다. 질문이 나오면 이렇게 답하세요 — **"모델 버전 관리는
-OpenShift AI의 모델 레지스트리에서 하고, MLflow는 측정 기록을 담당합니다. 둘 다
-쓸 필요는 없어서 한쪽만 씁니다."**
+**Models 메뉴는 특히 헷갈립니다.** 앞에서 모델 레지스트리를 보여준 뒤라 같은 이름이
+또 나옵니다. 질문이 나오면: *"모델 버전 관리는 OpenShift AI의 모델 레지스트리에서 하고,
+MLflow는 측정 기록을 담당합니다. 둘 다 쓸 필요는 없어서 한쪽만 씁니다."*
 
 ---
 
-## 한 문장으로 정리한다면
+## 주의 — 무대에서 걸릴 수 있는 것
 
-> **"평가를 돌릴 때마다 무엇을 어떻게 쟀는지가 여기 한 곳에 쌓입니다."**
+**run 이름.** 소급 기록한 run은 `모델 · run1` 식으로, 파이프라인이 만든 run은
+`모델 · pipeline · <작업ID 앞 8자>`로 이름이 붙습니다. 이름이 겹치지 않는지 미리 보세요.
 
-그래프나 자동 비교를 약속하지 마세요. 지금 구성에서는 **기록이 남는다**까지가 사실이고,
-그것만으로도 폴더에 결과 파일을 흩어 두는 것과는 다릅니다.
+**`FAILED` run 하나.** 캐시 문제로 모델 없이 측정을 시도했던 실행입니다. 지우지 마세요 —
+"실패도 기록에 남는다"는 좋은 한 마디가 됩니다. 질문이 나오면 그렇게 답하세요.
+
+**한 문장으로:**
+> **"평가를 돌릴 때마다 무엇을 어떤 조건으로 재서 얼마가 나왔는지가 여기 한 곳에 쌓이고,
+> 버전을 바꾸면 같은 표에서 비교합니다."**
 
 ---
 
 ## 데모 전 체크리스트
 
-- [ ] 샘플 experiment(`MLflow Demo`, `AIP-default`)를 지우거나, 어느 것이 우리 것인지
-      먼저 말할 준비
-- [ ] 평가 작업 이름을 모델명·시각이 들어가게 바꿔 run이 구분되는지
-- [ ] `evaluation-card.json`을 미리 한 번 열어 **JSON 뷰어가 접혀 있지 않은지** 확인
-- [ ] Artifacts 탭까지 가는 클릭 경로를 손에 익히기 (experiment → run → Artifacts)
-- [ ] `Running` 상태에 대한 답변 준비
-
-## 더 보여주고 싶다면
-
-지금 구성에서 그래프를 쓰려면 **metric을 직접 기록**해야 합니다. 평가 후 카드에서 값을
-읽어 `mlflow.log_metric`으로 넣는 단계를 파이프라인에 하나 추가하면, 그때부터 차트 탭과
-run 비교가 살아납니다. **이번 데모 범위에는 넣지 않았습니다.**
+- [ ] `scripts/16-mlflow-record.sh` 실행 — 빈 run이 없는지
+- [ ] 실행 목록에서 metric 열 3개 켜 두기 (브라우저가 기억합니다)
+- [ ] 차트 뷰에서 `output_tokens_per_second` 선택해 두기
+- [ ] Overview → Parameters에 `vllm_args`, `gpu`가 보이는지
+- [ ] Models 메뉴 질문 답변 준비
