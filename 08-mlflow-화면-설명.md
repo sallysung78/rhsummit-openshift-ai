@@ -35,9 +35,24 @@ metric도 param도 기록하지 않고 run을 `RUNNING`으로 남깁니다. 그 
 
 ---
 
+## ⚠️ 먼저 — experiment 상단의 `GenAI | Model training` 토글
+
+experiment를 열면 이름 옆에 **`GenAI` / `Model training`** 토글이 있습니다. 기본이
+`GenAI`이고, 그 화면은 **Traces · Sessions · Judges · Evaluation runs · Prompts** —
+에이전트 관측용입니다. 우리는 trace를 만들지 않으므로 Overview의 Traces/Latency/Errors가
+전부 "No data available"입니다. **비어 있는 게 정상입니다. 데이터가 없는 게 아닙니다.**
+
+**`Model training`을 누르세요.** run 목록·metric·차트가 그쪽에 있습니다.
+
+> 실제로 이 토글 때문에 "Overview에 아무것도 없다"고 오해했습니다. 데모 전에 토글을
+> `Model training`으로 두고 시작하세요.
+
+메뉴 위치(스크린샷 기준): 왼쪽 메뉴 **Develop & train → Experiments**. MLflow는 별도
+앱이 아니라 여기 임베드되어 있고, `Go to RHSummit` 링크로 워크스페이스를 오갑니다.
+
 ## 보여줄 것 — 세 뷰, 약 2분
 
-### ① Experiments → `rhsummit-model-validation` (15초)
+### ① Develop & train → Experiments → `rhsummit-model-validation` → **Model training** (15초)
 
 experiment가 세 개 보입니다. **`rhsummit-model-validation`만 여세요.** `AIP-default`와
 `MLflow Demo`는 기본 생성물·샘플입니다.
