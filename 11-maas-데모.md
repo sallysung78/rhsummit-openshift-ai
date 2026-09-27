@@ -21,7 +21,7 @@
 ## 켜는 데 실제로 필요했던 것 — DSC 스위치 하나로 끝나지 않습니다
 
 DSC에서 `aigateway: Managed` + `modelsAsAService: Managed`로 바꾸면 `ai-gateway-operator`와
-`maas-controller`가 뜹니다. 그다음 **전제조건 세 개가 차례로 드러났고, 셋 다 오퍼레이터가
+`maas-controller`가 뜹니다. 그다음 **전제조건 네 개가 차례로 드러났고, 셋 다 오퍼레이터가
 만들어 주지 않습니다.** 각각 상태 메시지가 정확히 무엇이 없는지 알려 줬습니다.
 
 | 순서 | 멈춘 곳 | 메시지 | 해결 |
@@ -29,6 +29,20 @@ DSC에서 `aigateway: Managed` + `modelsAsAService: Managed`로 바꾸면 `ai-ga
 | ① | AITenant | `gateway openshift-ingress/maas-default-gateway not found: the Gateway must be created by a network or cluster administrator` | 기존 `data-science-gateway`를 본떠 **Gateway 생성** (같은 클래스·TLS, allowedRoutes에 MaaS 네임스페이스 추가) |
 | ② | MaasTenantConfig | `dependency missing: AuthConfig CRD (authorino.kuadrant.io/v1beta3) not available` | **Red Hat Connectivity Link**(`rhcl-operator`, redhat-operators) 설치 + `Kuadrant` CR. 75초, authorino·limitador·dns 오퍼레이터가 함께 옴 |
 | ③ | MaasTenantConfig | `database Secret 'maas-db-config' not found in namespace 'redhat-ai-gateway-infra'. Create the Secret with key 'DB_CONNECTION_URL'` | **PostgreSQL 16 배포** + 연결 시크릿 |
+
+| ④ | Gen AI Studio 에서 **`maas-api is not available`** | maas-api 로그: `Gateway has no external hostname configured` · HTTPRoute: `namespace "redhat-ai-gateway-infra" is not allowed by the parent` | Gateway listener 에 **`hostname: maas.apps.<도메인>`** + **passthrough Route** + `allowedRoutes` 에 `redhat-ai-gateway-infra` 추가 |
+
+> ④는 백엔드가 Ready 인데 **UI에서만** 드러납니다. `MaasTenantConfig Ready=True` 여도
+> 게이트웨이에 외부 호스트명이 없으면 maas-api 의 `/v1/tenants` 가 500 을 내고, 대시보드는
+> "not available"을 띄웁니다. 확인: `curl https://maas.apps.<도메인>/maas-api/health` → 200,
+> 키 없이 `/v1/models` → 401 이면 게이트웨이·인증이 모두 정상입니다.
+>
+> **Route 는 reencrypt 가 아니라 passthrough** 여야 합니다. listener 에 hostname 을 주면
+> Istio 가 SNI 로 걸러내는데, reencrypt 에서는 라우터가 그 이름으로 SNI 를 보내지 않습니다.
+> 인증서는 같은 네임스페이스의 `router-certs-default`(`*.apps` 와일드카드)를 씁니다.
+>
+> 대시보드 게이트웨이의 인프라 ConfigMap(`data-science-gateway-config`)을 **같이 쓰지 마세요.**
+> 같은 이름의 serving-cert 를 두 서비스가 요청해 충돌합니다(`serving-cert-generation-error`).
 
 > **순서대로만 보입니다.** ①을 고치기 전엔 ②가, ②를 고치기 전엔 ③이 보이지 않습니다.
 > 한 번에 다 알려 주지 않으니, 켜기 전에 이 표를 체크리스트로 쓰세요.
