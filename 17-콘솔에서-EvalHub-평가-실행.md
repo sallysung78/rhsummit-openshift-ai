@@ -1,7 +1,7 @@
 # 17. 콘솔에서 EvalHub 평가 실행하기 (데모용)
 
 데모에서 **콘솔만으로** EvalHub 설정 내역을 보여주고, 평가를 실행하고, 결과를 보여주는 순서입니다.
-2026-10-05에 OpenShift AI 3.5.1 콘솔에서 직접 따라가며 확인한 내용입니다.
+2026-10-05에 OpenShift AI 3.5.1 콘솔에서 직접 따라가며 확인한 내용입니다. 같은 날 밤의 조치(시크릿 수정, 평가 묶음 추가, validated 모델 배포)를 반영했습니다. 모델과 측정 결과는 [19-validated-모델-반입-검증-결과.md](19-validated-모델-반입-검증-결과.md)에 있습니다.
 
 ## EvalHub 설명 대본
 
@@ -78,9 +78,9 @@
 |---|---|---|
 | 연결되는 EvalHub | `rhsummit` 네임스페이스의 EvalHub | `redhat-ods-applications`의 중앙 EvalHub (한방 설치 스크립트가 만든 것) |
 | 실행 이력 | 9월 26일부터의 성능 측정 이력이 있음 | 없음 |
-| 콘솔에서 실행 | **됨** (2026-10-05 확인, 2분 만에 완료) | **안 됨**. 작업이 Pending에서 멈춤 |
+| 콘솔에서 실행 | **됨** (2026-10-05 확인, 2~3분에 완료) | **안 됨**. 작업이 Pending에서 멈춤 |
 | 평가 도구 | GuideLLM, LM Evaluation Harness | 왼쪽 둘 + garak, lighteval |
-| 평가 묶음 | Standard LLM Evaluation Suite v1 | Open LLM Leaderboard v2, Safety & Fairness |
+| 평가 묶음 | Standard LLM Evaluation Suite v1, RHSummit Model Intake Validation, RHSummit Quick Accuracy Check | Open LLM Leaderboard v2, Safety & Fairness |
 
 `demo` 쪽이 멈추는 이유는 네트워크 정책입니다. 평가 작업은 `demo` 네임스페이스에서 돌고 결과를 중앙 EvalHub로 보내는데, `redhat-ods-applications`는 정해진 라벨이 붙은 네임스페이스의 연결만 받습니다. 그래서 결과 보고가 시간 초과로 끊깁니다.
 
@@ -113,22 +113,44 @@ OpenShift AI 콘솔에는 EvalHub 전용 설정 메뉴가 없습니다(Settings 
 
 ### 2. 실행하기
 
-"Steady-state load test" 카드의 **Select benchmark**를 누르면 입력 화면이 나옵니다.
+2026-10-05 밤에 평가 묶음 두 개를 추가하고 validated 모델을 InferenceService로 배포해서, 실행이 훨씬 단순해졌습니다. **권장 경로는 A**입니다.
+
+**A. 평가 묶음 + 모델 목록에서 선택 (권장)**
+
+1. Start evaluation run → **Benchmark suite** → **RHSummit Model Intake Validation** → Select benchmark suite
+2. 입력할 것은 두 가지뿐입니다.
+
+| 항목 | 넣을 값 |
+|---|---|
+| MLflow Experiment | Select existing experiment → `rhsummit-model-validation` |
+| Model | 목록에서 `gpt-oss-20b` 선택 |
+
+3. Benchmark suite threshold는 `3000`으로 떠 있습니다. **30 tok/s**라는 뜻이니 건드리지 않습니다.
+4. **Start evaluation run**. 약 2분 30초 뒤 Complete가 됩니다.
+
+주소, 시크릿, 파라미터를 입력할 필요가 없습니다. 묶음에 기준(30 tok/s)과 측정 설정이 들어 있고, 모델 주소는 콘솔이 알아서 채웁니다.
+
+**B. 목록에 없는 모델을 직접 지정 (예: `qwen3-32b-awq`)**
+
+LLMInferenceService로 배포한 모델은 목록에 나오지 않습니다. 이때는 Model에서 **Other (External endpoint)** 를 고르고 아래를 넣습니다.
 
 | 항목 | 넣을 값 | 설명 |
 |---|---|---|
-| Evaluation name | 예: `qwen3-32b-awq-console-demo` | 기본값은 날짜·시각 |
-| MLflow Experiment | **Select existing experiment** → `rhsummit-model-validation` | 기본 선택이 다른 실험일 수 있으니 확인 |
-| Source | `Model` | 기본값 |
-| Model | **Other (External endpoint)** | 아래 주의 참고 |
 | Model name | `qwen3-32b-awq` | 대소문자 구분 |
 | Endpoint URL | `https://qwen3-32b-awq-kserve-workload-svc.rhsummit.svc.cluster.local:8000/v1` | 클러스터 내부 주소 |
-| API key secret name | `evalhub-model-service-ca` | 이름은 API 키지만 **CA 인증서 시크릿**을 넣습니다 |
-| Benchmark threshold | **건드리지 않음** | 아래 주의 참고 |
-| Primary scorer metric | `output_tokens_per_second` | 기본값 |
-| Benchmark parameters | 체크 후 `{"rate": 2, "max_seconds": 60}` | JSON 입력 |
+| API key secret name | `evalhub-model-service-ca` | CA 인증서와 자리표시자 키가 든 시크릿 |
 
-**Start evaluation run**을 누르면 목록으로 돌아가고 "Evaluation started" 알림이 뜹니다. 상태는 Pending → Running → Complete로 바뀌며 약 2분 걸립니다.
+**Validate connection**을 누르면 "Connection established successfully."가 나옵니다.
+
+**정확도 묶음을 돌릴 때**
+
+**RHSummit Quick Accuracy Check**를 고르면 과학 추론, 윤리 판단, 통념 저항 3종(각 100문항)을 약 1분에 돌립니다. 이 묶음은 **Benchmark parameters**를 체크하고 토크나이저를 넣어야 합니다.
+
+```json
+{"tokenizer": "openai/gpt-oss-20b"}
+```
+
+Qwen3-8B는 `Qwen/Qwen3-8B`입니다. 넣지 않으면 "is not a valid model identifier" 오류로 실패합니다.
 
 기다리는 동안 보여줄 것: 목록에 쌓여 있는 이전 실행 이력, 또는 Observe & monitor의 GPU·llm-d 대시보드.
 
@@ -147,36 +169,44 @@ OpenShift AI 콘솔에는 EvalHub 전용 설정 메뉴가 없습니다(Settings 
 - 보이는 것: `output_tokens_per_second`, `mean_ttft_ms`, `mean_itl_ms`, `requests_per_second`.
 - 화면 설명은 [08-mlflow-화면-설명.md](08-mlflow-화면-설명.md)를 참고합니다.
 
-2026-10-05 콘솔 실행의 결과는 36.93 tok/s, 첫 토큰 평균 104.5 ms, Pass였습니다.
+2026-10-05 콘솔 실행 결과: `qwen3-32b-awq` 36.93 tok/s(첫 토큰 평균 104.5 ms), `gpt-oss-20b` 154.0 tok/s. 모두 Pass였습니다.
 
-## 콘솔에서 걸리는 것 다섯 가지
+## 콘솔에서 걸렸던 것과 지금 상태
 
-실제로 따라가며 확인한 것들입니다. 데모 전에 알고 있어야 당황하지 않습니다.
+처음 따라갔을 때 걸린 다섯 가지와, 2026-10-05 밤에 원인을 확인하고 조치한 결과입니다.
 
-1. **Model 목록에 운영 모델이 안 나옵니다.**
-   `qwen3-32b-awq`는 LLMInferenceService인데, 목록에는 InferenceService만 나옵니다. 그래서 `qwen36-35b-a3b-community`(사용 불가 표시)와 "Other (External endpoint)"만 보입니다. **Other를 고르고 주소를 직접 넣습니다.**
+| 걸렸던 것 | 원인 | 지금 |
+|---|---|---|
+| Validate connection이 실패 | 콘솔은 입력한 시크릿에서 `api-key` 필드를 찾는데, CA 인증서만 넣어 둔 시크릿이라 "does not contain an api-key data field"로 실패 | **해결.** 시크릿에 자리표시자 `api-key`를 추가. 성공으로 표시됨 |
+| 통과 기준 30을 넣을 수 없음 | 입력 칸이 0~100이고 값을 100으로 나눠 보냄. 30 tok/s는 3000이어야 하는데 100으로 잘림 | **우회.** 기준 30을 담은 평가 묶음을 만듦. 기본값이 3000으로 뜨고, 건드리지 않으면 30으로 저장되는 것을 확인 |
+| 점수가 `3693%`로 표시 | 콘솔이 모든 점수에 100을 곱해 %를 붙이도록 코드에 고정돼 있음(0~1 점수만 가정) | **고칠 수 없음.** 설정으로 바꿀 수 있는 항목이 아님. 아래 참고 |
+| Model 목록에 운영 모델이 없음 | 목록은 InferenceService만 보여줌. `qwen3-32b-awq`는 LLMInferenceService | **해결.** validated 모델을 InferenceService로 배포해 목록에서 선택 가능 |
+| Evaluations에 Tech Preview 표시 | 제품 상태 | 그대로. 먼저 말해 두는 편이 낫습니다 |
 
-2. **Validate connection은 실패로 나옵니다.**
-   "Connection verification failed."가 뜨지만 실행은 정상입니다. 데모에서는 이 버튼을 누르지 않습니다.
+### 점수 표시(`15401%`)에 대해
 
-3. **점수가 `3693%`처럼 표시됩니다.**
-   실제 값은 36.93 tok/s입니다. 콘솔이 모든 점수를 0~1 비율로 보고 100을 곱해 퍼센트로 표시하기 때문입니다. "초당 토큰 36.93을 퍼센트로 잘못 표시하는 기술 미리보기 단계의 화면"이라고 말하고, 정확한 값은 Experiments에서 보여줍니다.
+콘솔 소스에서 확인한 사실입니다. 결과 화면과 목록의 점수는 `점수 × 100`에 `%`를 붙여 표시하고, 기준 입력도 `기준 × 100`으로 보여줍니다. 정확도처럼 0~1 사이 점수에는 맞지만, 초당 토큰 수에는 맞지 않습니다. 대시보드 설정이나 EvalHub 설정으로 바꿀 수 없습니다.
 
-4. **통과 기준(threshold)을 콘솔에서는 30으로 넣을 수 없습니다.**
-   입력 칸의 최대값이 100이고, 100을 넣으면 실제로는 1 tok/s로 저장됩니다(같은 퍼센트 문제). 기본값은 1000으로 표시되는데 이는 10 tok/s에 해당합니다. 값을 고치면 100으로 잘리므로 **건드리지 않습니다**. 건드리지 않았을 때 10이 그대로 들어가는지는 확인하지 못했습니다.
-   우리 기준(30 tok/s, 첫 토큰 200 ms)으로 판정하는 것은 **검증 파이프라인의 gate 단계**입니다. 콘솔 실행은 "측정"을, 파이프라인은 "우리 기준 판정"을 보여주는 것으로 역할을 나눕니다.
+데모에서는 이렇게 다룹니다.
 
-5. **Evaluations는 Tech Preview 표시가 붙어 있습니다.**
-   메뉴 옆에 그대로 보이므로 먼저 말해 두는 편이 낫습니다.
+- **성능 수치는 Experiments 화면에서 보여줍니다.** 단위가 붙지 않은 원래 값(154.0, 66.9)이 나옵니다.
+- Evaluations 화면에서는 **Pass 표시와 실행 이력**을 보여주는 데 씁니다.
+- 정확도 묶음은 점수가 0~1이라 `55%`, `65%`처럼 올바르게 나옵니다. 화면으로 점수를 보여주고 싶으면 정확도 묶음 결과를 엽니다.
+
+### 새로 알게 된 것
+
+- **목록에서 모델을 고른 실행은 첫 토큰 시간이 0으로 기록됩니다.** 콘솔이 주소 끝에 `/v1`을 붙이지 않고 넘기는데, 이 경우 GuideLLM이 첫 토큰 시간을 재지 못합니다. 첫 토큰 시간을 보려면 B 경로(주소 직접 입력)나 평가 파이프라인을 씁니다.
+- **기본 제공 묶음 "Standard LLM Evaluation Suite v1"은 이 환경에서 돌지 않습니다.** 12종 중 시험한 3종이 모두 실패했습니다(작업 이름 미등록 2종, 필요한 언어 자료 없음 1종).
+- **EvalHub에는 저장소가 없습니다.** 파드가 재시작되면 실행 이력과 직접 만든 평가 묶음이 사라집니다. 묶음은 `scripts/21-evalhub-collections.sh`로 다시 만듭니다. 측정값은 MLflow에 남아 있습니다.
 
 ## 데모 전 준비
 
-- [ ] 모델 `qwen3-32b-awq`가 Ready인지 확인
-- [ ] `rhsummit`에 시크릿 `evalhub-model-service-ca`가 있는지 확인 (없으면 `scripts/19-evalhub-model-ca.sh`)
-- [ ] Endpoint URL과 파라미터 JSON을 메모장에 준비 (화면에서 타이핑하면 길고 틀리기 쉽습니다)
+- [ ] 모델 `gpt-oss-20b`가 Ready인지 확인 (Models → Deployments)
+- [ ] Evaluations → Start evaluation run → Benchmark suite에 "RHSummit ..." 묶음 두 개가 보이는지 확인. 없으면 `scripts/21-evalhub-collections.sh`
+- [ ] B 경로를 쓸 경우 시크릿 `evalhub-model-service-ca` 확인 (없으면 `scripts/19-evalhub-model-ca.sh`)
 - [ ] 콘솔에서 한 번 미리 실행해 Complete까지 가는지 확인
-- [ ] 목록에 Failed로 남은 실행이 눈에 띄면 지울지 결정
-  - `qwen3-32b-awq-safety-fairness-sample`(10월 5일)은 안전성 평가 시험 실행이며 6종 중 1종이 실패해 Failed로 표시됩니다.
+- [ ] 목록에 눈에 띄는 실패 실행이 있으면 지울지 결정
+  - "Oct 5, 2026, 12:55 AM"은 시크릿 없이 실행돼 끝나지 않은 실행입니다.
 
 ## 안전성 평가 묶음은 데모에 쓰지 않습니다
 
