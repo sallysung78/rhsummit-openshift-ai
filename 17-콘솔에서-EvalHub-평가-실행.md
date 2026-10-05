@@ -123,7 +123,7 @@ OpenShift AI 콘솔에는 EvalHub 전용 설정 메뉴가 없습니다(Settings 
 | 항목 | 넣을 값 |
 |---|---|
 | MLflow Experiment | Select existing experiment → `rhsummit-model-validation` |
-| Model | 목록에서 `gpt-oss-20b` 선택 |
+| Model | 목록에서 `qwen36-35b-a3b-nvfp4` 선택 |
 
 3. Benchmark suite threshold는 `3000`으로 떠 있습니다. **30 tok/s**라는 뜻이니 건드리지 않습니다.
 4. **Start evaluation run**. 약 2분 30초 뒤 Complete가 됩니다.
@@ -147,10 +147,10 @@ LLMInferenceService로 배포한 모델은 목록에 나오지 않습니다. 이
 **RHSummit Quick Accuracy Check**를 고르면 과학 추론, 윤리 판단, 통념 저항 3종(각 100문항)을 약 1분에 돌립니다. 이 묶음은 **Benchmark parameters**를 체크하고 토크나이저를 넣어야 합니다.
 
 ```json
-{"tokenizer": "openai/gpt-oss-20b"}
+{"tokenizer": "Qwen/Qwen3.6-35B-A3B"}
 ```
 
-Qwen3-8B는 `Qwen/Qwen3-8B`입니다. 넣지 않으면 "is not a valid model identifier" 오류로 실패합니다.
+gpt-oss-20b는 `openai/gpt-oss-20b`, Qwen3-8B는 `Qwen/Qwen3-8B`입니다. 넣지 않으면 "is not a valid model identifier" 오류로 실패합니다.
 
 기다리는 동안 보여줄 것: 목록에 쌓여 있는 이전 실행 이력, 또는 Observe & monitor의 GPU·llm-d 대시보드.
 
@@ -166,10 +166,12 @@ Qwen3-8B는 `Qwen/Qwen3-8B`입니다. 넣지 않으면 "is not a valid model ide
 
 - 왼쪽 메뉴 **Develop & train → Experiments** → Project `RHSummit`
 - 실험 이름(`rhsummit-model-validation`)을 눌러 방금 실행을 엽니다.
+- 화면 위 토글을 **Model training**으로 둡니다. GenAI 쪽에는 실행이 보이지 않습니다.
 - 보이는 것: `output_tokens_per_second`, `mean_ttft_ms`, `mean_itl_ms`, `requests_per_second`.
+- **콘솔에서 돌린 성능 평가는 그대로 두면 수치가 보이지 않습니다.** EvalHub가 만든 실행이 RUNNING으로 남고 GuideLLM 도구는 MLflow에 아무것도 쓰지 않기 때문입니다. 실행 뒤 `scripts/22-evalhub-mlflow-sync.sh`를 돌리면 수치·판정·읽기 쉬운 실행 이름이 채워지고 Finished가 됩니다. 평가 파이프라인은 같은 일을 스스로 합니다.
 - 화면 설명은 [08-mlflow-화면-설명.md](08-mlflow-화면-설명.md)를 참고합니다.
 
-2026-10-05 콘솔 실행 결과: `qwen3-32b-awq` 36.93 tok/s(첫 토큰 평균 104.5 ms), `gpt-oss-20b` 154.0 tok/s. 모두 Pass였습니다.
+2026-10-05 콘솔 실행 결과: `qwen36-35b-a3b-nvfp4` 121.38 tok/s(첫 토큰 41.2 ms), `qwen3-32b-awq` 36.93 tok/s(첫 토큰 104.5 ms), `gpt-oss-20b` 154.0 tok/s. 모두 Pass였습니다. 데모 2의 순서는 [20-데모2-배포된-모델-검증.md](20-데모2-배포된-모델-검증.md)에 있습니다.
 
 ## 콘솔에서 걸렸던 것과 지금 상태
 
@@ -189,19 +191,19 @@ Qwen3-8B는 `Qwen/Qwen3-8B`입니다. 넣지 않으면 "is not a valid model ide
 
 데모에서는 이렇게 다룹니다.
 
-- **성능 수치는 Experiments 화면에서 보여줍니다.** 단위가 붙지 않은 원래 값(154.0, 66.9)이 나옵니다.
+- **성능 수치는 Experiments 화면에서 보여줍니다.** 단위가 붙지 않은 원래 값(121.4 등)이 나옵니다. 콘솔 실행이면 먼저 `scripts/22-evalhub-mlflow-sync.sh`를 돌립니다.
 - Evaluations 화면에서는 **Pass 표시와 실행 이력**을 보여주는 데 씁니다.
 - 정확도 묶음은 점수가 0~1이라 `55%`, `65%`처럼 올바르게 나옵니다. 화면으로 점수를 보여주고 싶으면 정확도 묶음 결과를 엽니다.
 
 ### 새로 알게 된 것
 
-- **목록에서 모델을 고른 실행은 첫 토큰 시간이 0으로 기록됩니다.** 콘솔이 주소 끝에 `/v1`을 붙이지 않고 넘기는데, 이 경우 GuideLLM이 첫 토큰 시간을 재지 못합니다. 첫 토큰 시간을 보려면 B 경로(주소 직접 입력)나 평가 파이프라인을 씁니다.
+- **첫 토큰 시간이 0으로 기록되는 것은 gpt-oss-20b에서만 생깁니다.** 처음에는 콘솔이 주소 끝에 `/v1`을 붙이지 않아서라고 봤지만, 같은 방식으로 `qwen36-35b-a3b-nvfp4`를 재면 41.2 ms가 정상으로 나옵니다. gpt-oss-20b는 추론형 모델이라 GuideLLM이 첫 토큰을 제대로 잡지 못합니다.
 - **기본 제공 묶음 "Standard LLM Evaluation Suite v1"은 이 환경에서 돌지 않습니다.** 12종 중 시험한 3종이 모두 실패했습니다(작업 이름 미등록 2종, 필요한 언어 자료 없음 1종).
 - **EvalHub에는 저장소가 없습니다.** 파드가 재시작되면 실행 이력과 직접 만든 평가 묶음이 사라집니다. 묶음은 `scripts/21-evalhub-collections.sh`로 다시 만듭니다. 측정값은 MLflow에 남아 있습니다.
 
 ## 데모 전 준비
 
-- [ ] 모델 `gpt-oss-20b`가 Ready인지 확인 (Models → Deployments)
+- [ ] 모델 `qwen36-35b-a3b-nvfp4`가 Ready인지 확인 (Models → Deployments)
 - [ ] Evaluations → Start evaluation run → Benchmark suite에 "RHSummit ..." 묶음 두 개가 보이는지 확인. 없으면 `scripts/21-evalhub-collections.sh`
 - [ ] B 경로를 쓸 경우 시크릿 `evalhub-model-service-ca` 확인 (없으면 `scripts/19-evalhub-model-ca.sh`)
 - [ ] 콘솔에서 한 번 미리 실행해 Complete까지 가는지 확인
