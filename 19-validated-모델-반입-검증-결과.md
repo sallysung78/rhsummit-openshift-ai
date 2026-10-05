@@ -10,6 +10,34 @@
 | Red Hat validated 모델 | 카탈로그의 최소 VRAM과 성능표를 보고 우리 GPU에 맞는 모델을 고른다 | **배포 성공** |
 | 반입 후 검증 | 우리 GPU에서 성능과 정확도를 측정해 기준과 비교한다 | **통과 → 레지스트리 등록** |
 
+## 핵심: 같은 모델로 대비
+
+가장 설명하기 좋은 짝은 **Qwen3.6-35B-A3B**입니다. 같은 모델의 커뮤니티 원본과 Red Hat validated 양자화판을 같은 GPU에 올렸습니다.
+
+| | 커뮤니티 원본 | Red Hat validated (NVFP4) |
+|---|---|---|
+| 모델 | `Qwen/Qwen3.6-35B-A3B` | `RedHatAI/Qwen3.6-35B-A3B-NVFP4` |
+| 배포 전에 알 수 있는 것 | 필요 메모리 정보 없음 | 카탈로그에 최소 VRAM **28.9 GB**, A100-80에서 토큰 간 7.9 ms |
+| 크기 | 67 GiB | 23.3 GiB |
+| 배포 | **실패** (10분 뒤 GPU 메모리 부족) | **성공** (GPU 메모리 21.9 GiB 사용) |
+| 생성 속도 | - | **121.3 tok/s** |
+| 토큰 간 지연 | - | **7.98 ms** (카탈로그 7.9 ms와 거의 같음) |
+| 첫 토큰 | - | 42.8 ms |
+| 판정 | 배포 불가 | **통과 → 레지스트리 등록** |
+
+말할 수 있는 것은 세 가지입니다.
+
+1. 원본은 올려 보고서야 안 된다는 것을 알았습니다. validated 모델은 카탈로그의 최소 VRAM으로 배포 전에 판단했습니다.
+2. 카탈로그에 L40S 측정값은 없지만, 우리 GPU에서 잰 토큰 간 지연(7.98 ms)이 카탈로그의 A100-80 값(7.9 ms)과 거의 같게 나왔습니다. 카탈로그 값이 참고가 된다는 것을 직접 확인한 셈입니다.
+3. 지난번에 기준 미달이었던 것은 같은 모델의 FP8판입니다. FP8은 최소 VRAM이 43.1 GB라 48GB GPU에 빠듯해서 절약 설정으로 띄웠고 9.87 tok/s가 나왔습니다. NVFP4는 여유가 있어 **기본 설정 그대로** 띄웠습니다. 카탈로그의 최소 VRAM을 보고 우리 GPU에 여유 있는 양자화판을 골라야 한다는 것이 교훈입니다.
+
+조심할 점도 있습니다.
+
+- **L40S는 FP4 연산을 직접 지원하지 않습니다.** vLLM이 가중치만 FP4로 처리하는 방식으로 돌리고, 시작 로그에 "성능이 낮아질 수 있다"는 경고가 나옵니다. 그런데도 121 tok/s가 나왔습니다.
+- **정확도 표본 3종 중 하나(통념 저항, 0.27)는 항목 기준 0.30에 못 미쳤습니다.** 묶음 전체 점수(0.603)는 기준 0.5를 넘어 통과입니다. 100문항 표본이고 기준값은 자리표시자라는 점을 같이 말해야 합니다.
+
+아래는 이 짝을 찾기 전에 먼저 시험한 두 모델(gpt-oss-20b, Qwen3-8B-FP8)을 포함한 전체 기록입니다.
+
 ## 모델을 고른 근거
 
 우리 GPU는 NVIDIA L40S 48GB 1장입니다. 카탈로그 성능 데이터(모델 122종)를 전부 확인했습니다.
@@ -35,6 +63,7 @@
 | Qwen3.6-35B-A3B 원본 | 커뮤니티, 양자화 없음 (67 GiB) | **실패** | - | - | - | 배포 불가 |
 | gpt-oss-20b | Red Hat validated | 성공 (첫 배포 13분, 재시작 3분) | **154.0 tok/s** | 19~32 ms | 0.55 (기준 0.5) | **통과** |
 | Qwen3-8B-FP8-dynamic | Red Hat validated | 성공 (5분) | **66.9 tok/s** | 26 ms | 0.65 (기준 0.5) | **통과** |
+| Qwen3.6-35B-A3B-NVFP4 | Red Hat validated | 성공 (37분, 이미지 25GB 내려받기 포함) | **121.3 tok/s** | 43 ms | 0.60 (기준 0.5) | **통과** |
 
 참고로 이전 운영 모델인 커뮤니티 양자화 Qwen3-32B-AWQ는 36.9 tok/s, 첫 토큰 105 ms였습니다.
 
@@ -59,6 +88,7 @@ GPU 0 has a total capacity of 44.39 GiB of which 119.31 MiB is free.
 |---|---|---|
 | gpt-oss-20b | 토큰 간 10.7 ms(약 94 tok/s), 첫 토큰 59 ms | 154.0 tok/s, 첫 토큰 19~32 ms |
 | Qwen3-8B-FP8-dynamic | 토큰 간 11.7 ms(약 86 tok/s), 첫 토큰 75 ms | 66.9 tok/s, 첫 토큰 26 ms |
+| Qwen3.6-35B-A3B-NVFP4 | A100-80 1장: 토큰 간 7.9 ms(약 127 tok/s), 첫 토큰 97 ms | 토큰 간 7.98 ms, 121.3 tok/s, 첫 토큰 43 ms |
 
 가속기와 입력 길이가 달라 직접 비교는 아닙니다. 같은 자릿수로 나온다는 것까지만 말할 수 있습니다.
 
@@ -66,7 +96,7 @@ GPU 0 has a total capacity of 44.39 GiB of which 119.31 MiB is free.
 
 - **gpt-oss-20b는 추론형 모델이라 측정이 일부 맞지 않습니다.** 답하기 전의 생각 과정을 별도 필드로 내보내는데, GuideLLM이 이를 본문 토큰으로 세지 않습니다. 그래서 토큰 간 지연이 0으로 기록되고, 첫 토큰 시간도 실행마다 다르게(19 ms, 32 ms, 콘솔 목록 선택 실행에서는 0) 나옵니다. **초당 토큰 수(154)는 세 번 모두 같은 값**이 나왔습니다.
 - **정확도 묶음은 데모용 표본입니다.** 영어 공개 벤치마크 3종을 100문항씩 돌린 것이고, 기준값은 서비스팀이 정할 값의 자리표시자입니다. gpt-oss-20b는 세 항목 모두 기준을 0.01~0.03 차이로 넘겼습니다. 모델의 품질 순위로 읽으면 안 됩니다.
-- **두 모델 모두 통과했습니다.** "validated 모델 중 하나만 통과"하는 그림은 아닙니다. 하나만 통과로 보이게 하려면 기준을 서비스 요구에 맞게 올려야 하는데(예: 100 tok/s), 그 기준에는 근거가 있어야 합니다.
+- **세 validated 모델 모두 통과했습니다.** "validated 모델 중 하나만 통과"하는 그림은 아닙니다. 하나만 통과로 보이게 하려면 기준을 서비스 요구에 맞게 올려야 하는데(예: 100 tok/s), 그 기준에는 근거가 있어야 합니다.
 
 ## 레지스트리 등록
 
@@ -76,8 +106,9 @@ GPU 0 has a total capacity of 44.39 GiB of which 119.31 MiB is free.
 |---|---|---|
 | `gpt-oss-20b` | v1 | 출처, 모델 이미지 주소, 카탈로그 최소 VRAM, 측정 가속기, 실측 속도와 첫 토큰, 정확도 점수, 판정 기준, 상태 |
 | `qwen3-8b-fp8` | v1 | 같음 |
+| `qwen-demo` | **v3-35b-nvfp4** | 같음. 기존 계보에 이어 붙임 |
 
-기존 `qwen-demo`(커뮤니티 원본 실패, FP8 미달, 32B-AWQ 채택 기록)는 그대로 두었습니다.
+`qwen-demo`에는 같은 모델의 이력이 한 줄로 이어집니다: v0 커뮤니티 원본(실패) → v1 FP8(메모리 빠듯, 미달) → v2 32B-AWQ(커뮤니티 양자화, 채택) → **v3 NVFP4(validated, 통과)**.
 
 ## 평가 전용 파이프라인
 
@@ -96,9 +127,10 @@ check-model → performance-suite → accuracy-suite → verdict
 
 - 콘솔 위치: **Develop & train → Pipelines → Pipeline definitions → `model-evaluation`**
 - 걸리는 시간: 약 5분
-- 2026-10-05에 두 모델로 끝까지 실행해 성공했습니다.
+- 2026-10-05에 세 모델로 끝까지 실행해 성공했습니다.
   - `PASSED gpt-oss-20b: 154.02 tok/s, TTFT 19.3 ms, accuracy suite score 0.550`
   - `PASSED qwen3-8b-fp8: 66.86 tok/s, TTFT 26.2 ms, accuracy suite score 0.650`
+  - `PASSED qwen36-35b-a3b-nvfp4: 121.29 tok/s, TTFT 42.8 ms, accuracy suite score 0.603`
 - 성능과 정확도를 차례로 돌립니다. GPU가 1장이라 동시에 돌리면 성능 수치가 흔들리기 때문입니다.
 
 두 묶음의 기준은 EvalHub에 들어 있고, 파이프라인은 통과 여부를 읽어 옵니다. 콘솔의 Benchmark suite 화면에서 같은 묶음을 직접 실행할 수도 있습니다([17번 문서](17-콘솔에서-EvalHub-평가-실행.md)).
@@ -107,8 +139,9 @@ check-model → performance-suite → accuracy-suite → verdict
 
 | 모델 | 상태 | 비고 |
 |---|---|---|
-| `gpt-oss-20b` | **서빙 중** | GPU 사용 중. 클러스터 내부 주소만 있음 |
-| `qwen3-8b-fp8` | 정지 | 정지 표시를 지우면 다시 뜸 |
+| `qwen36-35b-a3b-nvfp4` | **서빙 중** | GPU 사용 중. 클러스터 내부 주소만 있음 |
+| `gpt-oss-20b` | 정지 | 정지 표시를 지우면 다시 뜸 (이미지가 노드에 있어 약 3분) |
+| `qwen3-8b-fp8` | 정지 | 같음 |
 | `qwen36-35b-a3b-community` | 정지 | 실패 기록용 |
 | `qwen3-32b-awq` (이전 운영 모델) | 복제본 0으로 내림 | 외부 게이트웨이 주소는 남아 있으나 응답할 모델이 없음 |
 
@@ -116,9 +149,9 @@ GPU가 1장이라 한 번에 하나만 뜹니다. 바꾸는 방법은 이렇습�
 
 ```bash
 # 지금 모델 정지
-oc -n rhsummit annotate inferenceservice gpt-oss-20b serving.kserve.io/stop=true --overwrite
+oc -n rhsummit annotate inferenceservice qwen36-35b-a3b-nvfp4 serving.kserve.io/stop=true --overwrite
 # 다른 모델 시작
-oc -n rhsummit annotate inferenceservice qwen3-8b-fp8 serving.kserve.io/stop-
+oc -n rhsummit annotate inferenceservice gpt-oss-20b serving.kserve.io/stop-
 ```
 
 이전 운영 모델로 되돌리려면 validated 모델을 정지한 뒤 복제본을 1로 올립니다.
@@ -142,7 +175,7 @@ DeepSeek, Qwen, gpt-oss, GLM 계열을 카탈로그 성능 데이터에서 뽑�
 | **gpt-oss-20b** | 15.9 GB | A100-40, L4 | 이번에 배포·측정 |
 | gpt-oss-20b-essential | 15.9 GB | A100-40, L4 | |
 | Qwen2.5-7B-Instruct (양자화 없음) | 17.6 GB | A100-40, L4 | |
-| Qwen3.6-35B-A3B-NVFP4 | 28.9 GB | A100-80, H100, H200 | FP4 형식. L40S에서 제 성능이 나는지 확인 안 됨 |
+| **Qwen3.6-35B-A3B-NVFP4** | 28.9 GB | A100-80, H100, H200 | 이번에 배포·측정. 121.3 tok/s |
 | Qwen3.6-35B-A3B-FP8 | 43.1 GB | A100-80, H100, H200 | 지난번에 시험. 메모리가 빠듯해 9.87 tok/s (`--enforce-eager` 등 절약 설정) |
 | Qwen3.5-35B-A3B-FP8-dynamic | 43.4 GB | A100-80, H100, H200 | 위와 같이 빠듯함 |
 
@@ -159,7 +192,7 @@ DeepSeek, Qwen, gpt-oss, GLM 계열을 카탈로그 성능 데이터에서 뽑�
 
 | 파일 | 내용 |
 |---|---|
-| `manifests/84-isvc-gpt-oss-20b.yaml`, `85-isvc-qwen3-8b-fp8.yaml` | validated 모델 배포 |
+| `manifests/84-isvc-gpt-oss-20b.yaml`, `85-isvc-qwen3-8b-fp8.yaml`, `86-isvc-qwen36-35b-a3b-nvfp4.yaml` | validated 모델 배포 |
 | `scripts/21-evalhub-collections.sh` | 평가 묶음 두 개 생성 |
 | `scripts/20-eval-pipeline.sh` | 평가 파이프라인 업로드와 실행 |
 | `pipelines/evaluation_pipeline.py` | 평가 파이프라인 정의 |
